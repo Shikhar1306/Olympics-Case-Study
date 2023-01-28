@@ -205,3 +205,164 @@ on ae.NOC = nr.NOC
 group by ae.Games, nr.region
 order by ae.Games, nr.region;
 
+--16. Identify which country won the most gold, most silver and most bronze medals in each olympic games.
+
+with total_gold as
+(
+	select ae.Games, nr.region Country, count(ae.Medal) gold
+	from athlete_events ae
+	inner join noc_regions nr
+	on ae.NOC = nr.NOC
+	where Medal = 'Gold'
+	group by ae.Games, nr.region
+),
+total_gold_rank as
+(
+	select distinct Games, concat(first_value(Country) over(partition by Games order by gold desc),' - ',first_value(gold) over(partition by Games order by gold desc)) max_gold
+	from total_gold
+),
+total_silver as
+(
+	select ae.Games, nr.region Country, count(ae.Medal) silver
+	from athlete_events ae
+	inner join noc_regions nr
+	on ae.NOC = nr.NOC
+	where Medal = 'Silver'
+	group by ae.Games, nr.region
+),
+total_silver_rank as
+(
+	select distinct Games, concat(first_value(Country) over(partition by Games order by silver desc),' - ',first_value(silver) over(partition by Games order by silver desc)) max_silver
+	from total_silver
+),
+total_bronze as
+(
+	select ae.Games, nr.region Country, count(ae.Medal) bronze
+	from athlete_events ae
+	inner join noc_regions nr
+	on ae.NOC = nr.NOC
+	where Medal = 'Bronze'
+	group by ae.Games, nr.region
+),
+total_bronze_rank as
+(
+	select distinct Games, concat(first_value(Country) over(partition by Games order by bronze desc),' - ',first_value(bronze) over(partition by Games order by bronze desc)) max_bronze
+	from total_bronze
+)
+select tgr.Games, tgr.max_gold, tsr.max_silver, tbr.max_bronze
+from total_gold_rank tgr
+inner join total_silver_rank tsr
+on tgr.Games = tsr.Games
+inner join total_bronze_rank tbr
+on tgr.Games = tbr.Games
+order by tgr.Games;
+
+--17. Identify which country won the most gold, most silver, most bronze medals and the most medals in each olympic games.
+
+with total_gold as
+(
+	select ae.Games, nr.region Country, count(ae.Medal) gold
+	from athlete_events ae
+	inner join noc_regions nr
+	on ae.NOC = nr.NOC
+	where Medal = 'Gold'
+	group by ae.Games, nr.region
+),
+total_gold_rank as
+(
+	select distinct Games, concat(first_value(Country) over(partition by Games order by gold desc),' - ',first_value(gold) over(partition by Games order by gold desc)) max_gold
+	from total_gold
+),
+total_silver as
+(
+	select ae.Games, nr.region Country, count(ae.Medal) silver
+	from athlete_events ae
+	inner join noc_regions nr
+	on ae.NOC = nr.NOC
+	where Medal = 'Silver'
+	group by ae.Games, nr.region
+),
+total_silver_rank as
+(
+	select distinct Games, concat(first_value(Country) over(partition by Games order by silver desc),' - ',first_value(silver) over(partition by Games order by silver desc)) max_silver
+	from total_silver
+),
+total_bronze as
+(
+	select ae.Games, nr.region Country, count(ae.Medal) bronze
+	from athlete_events ae
+	inner join noc_regions nr
+	on ae.NOC = nr.NOC
+	where Medal = 'Bronze'
+	group by ae.Games, nr.region
+),
+total_bronze_rank as
+(
+	select distinct Games, concat(first_value(Country) over(partition by Games order by bronze desc),' - ',first_value(bronze) over(partition by Games order by bronze desc)) max_bronze
+	from total_bronze
+),
+total_medals as
+(
+	select ae.Games, nr.region Country, count(ae.Medal) medals
+	from athlete_events ae
+	inner join noc_regions nr
+	on ae.NOC = nr.NOC
+	where Medal in ('Bronze', 'Silver', 'Gold')
+	group by ae.Games, nr.region
+),
+total_medals_rank as
+(
+	select distinct Games, concat(first_value(Country) over(partition by Games order by medals desc),' - ',first_value(medals) over(partition by Games order by medals desc)) max_medals
+	from total_medals
+)
+select tgr.Games, tgr.max_gold, tsr.max_silver, tbr.max_bronze, tmr.max_medals
+from total_gold_rank tgr
+inner join total_silver_rank tsr
+on tgr.Games = tsr.Games
+inner join total_bronze_rank tbr
+on tgr.Games = tbr.Games
+inner join total_medals_rank tmr
+on tgr.Games = tmr.Games
+order by tgr.Games;
+
+--18. Which countries have never won gold medal but have won silver/bronze medals?
+
+with country_point_table as
+(
+	select nr.region Country,
+	sum(case when Medal='Gold' then 1 else 0 end) as gold,
+	sum(case when Medal= 'Silver' then 1 else 0 end) as silver,
+	sum(case when Medal= 'Bronze' then 1 else 0 end) as bronze
+	from athlete_events ae 
+	inner join noc_regions nr 
+	on ae.NOC=nr.NOC
+	group by nr.region
+)
+Select Country, gold, silver, bronze 
+from country_point_table
+where gold = 0 and (silver > 0 or bronze > 0);
+
+--19. In which Sport/event, India has won highest medals.
+
+with india_medal as
+(
+	select NOC, Sport, count(Medal) total_medals, dense_rank() over(order by count(Medal) desc) rnk
+	from athlete_events
+	where Medal in ('Bronze', 'Silver', 'Gold') and NOC = 'IND'
+	group by NOC, Sport
+)
+select Sport, total_medals
+from india_medal
+where rnk = 1;
+
+--20. Break down all olympic games where India won medal for Hockey and how many medals in each olympic games
+
+select Team, Sport, Games, count(Medal) total_medals
+from athlete_events
+where Medal in ('Bronze', 'Silver', 'Gold') and Sport = 'Hockey' and Team = 'India'
+group by Team, Sport, Games
+order by total_medals desc;
+
+
+
+
